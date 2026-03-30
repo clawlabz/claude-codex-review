@@ -111,125 +111,202 @@ gh pr diff <number>
 ```
 
 **For `project` mode:**
-Gather a holistic view of the project:
-1. Read CLAUDE.md, README.md, package.json (or Cargo.toml, go.mod, etc.) for project overview
-2. Get project structure: `find . -type f -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/dist/*' | head -200`
-3. Count lines of code: `git ls-files | xargs wc -l 2>/dev/null | tail -1` or `find`-based
-4. Get recent git activity: `git log --oneline -20`
-5. Check for TODOs/FIXMEs: `grep -r "TODO\|FIXME\|HACK\|XXX" --include="*.ts" --include="*.tsx" --include="*.py" --include="*.rs" --include="*.go" -c`
-6. Check test coverage if available
-7. List key directories and their purpose
-8. Sample representative files from each major module (read 2-3 key files)
+Gather a **lightweight project brief** only (Codex will explore the rest itself):
+1. Read CLAUDE.md or README.md for project overview
+2. Read package.json / Cargo.toml / go.mod for dependencies and scripts
+3. Get top-level directory structure: `ls -la` + `ls` of key subdirectories
+4. Count files and LOC: `git ls-files | wc -l` and `git ls-files | xargs wc -l 2>/dev/null | tail -1`
+5. Get recent git activity: `git log --oneline -10`
+
+**Do NOT** try to read all project files — Codex runs as an agent in the project directory and will explore the codebase itself.
 
 **For `ask` mode:**
-- The user's question IS the review prompt
-- Gather relevant context based on what the question is about:
-  - If about a specific module → read those files
-  - If about architecture → get project structure + key files
-  - If about performance → find hot paths, DB queries, API routes
-  - If general → use project-level context (same as `project` mode but lighter)
+Gather minimal context to orient Codex:
+1. Read CLAUDE.md or README.md
+2. Get directory structure overview
+3. If the question mentions specific files/modules, note their paths
+
+**Do NOT** try to pre-read everything the question might need — Codex will navigate the codebase to find answers.
 
 Tell the user what context was gathered (file count, diff size, etc.)
 
 ## Step 3: Build Review Prompt
 
-Construct the Codex prompt based on mode + focus:
+Write the review prompt to a temp file. The prompt has 3 parts:
 
-**Base template:**
+### Part 1: Project Brief (for project/ask modes)
+
+Include the lightweight context gathered in Step 2:
 ```
-You are reviewing a project. Here is the project context:
-{CLAUDE.md or README content}
+## Project Brief
+{CLAUDE.md or README content, truncated to key sections}
+
+## Project Stats
+- Files: {count}, LOC: {lines}
+- Stack: {detected from package.json/Cargo.toml/go.mod}
+- Structure: {top-level directory listing}
+- Recent activity: {last 10 commits}
+```
+
+### Part 2: Review Instructions (mode + focus specific)
+
+For `project` mode — build instructions per focus dimension:
+
+```
+You are an independent code reviewer. Explore this codebase thoroughly and assess it.
 
 Focus areas: {focus dimensions}
 
-{mode-specific instructions}
+For each focus area, you MUST:
+1. Navigate the actual source files — read key modules, entry points, configs
+2. Look for real evidence, not surface-level impressions
+3. Score each dimension X/10 with specific justification
 
-{gathered context}
+{include relevant focus-specific instructions below}
 
-{custom_prompt if provided}
-
-Provide your findings in this format:
+Output format:
 ## Findings
-For each issue:
+For each issue found:
 - **Severity**: CRITICAL / HIGH / MEDIUM / LOW / INFO
-- **Category**: {focus dimension it falls under}
-- **Location**: file:line (if applicable)
+- **Category**: {which focus dimension}
+- **Location**: file:line
 - **Issue**: what's wrong
-- **Suggestion**: how to fix or improve
-- **Rationale**: why this matters
+- **Suggestion**: how to fix
+- **Rationale**: why it matters
 
-## Summary
-- Overall assessment (1-2 paragraphs)
-- Score: X/10 for each focus dimension
-- Top 3 priorities to address
-```
+## Scores
+| Dimension | Score | Justification |
+|-----------|-------|---------------|
 
-**Mode-specific prompt additions:**
-
-For `project --focus completeness`:
-```
-Assess project completeness:
-- What features appear planned but unfinished? (TODOs, stubs, placeholder UI)
-- What critical functionality is missing for a production-ready product?
-- Are there dead code paths or abandoned experiments?
-- Is documentation complete?
-- Are there integration points that aren't connected?
-Score completeness as a percentage with justification.
+## Top 3 Priorities
+1. ...
+2. ...
+3. ...
 ```
 
-For `project --focus quality`:
+Focus-specific instruction blocks (include only the requested dimensions):
+
+**completeness:**
 ```
-Assess code quality:
-- Naming conventions: are they consistent and descriptive?
-- Function/file size: any god functions or god files?
-- DRY: is there significant duplication?
-- Error handling: is it comprehensive or spotty?
-- Type safety: are types well-defined or loose?
-- Dependencies: are they well-managed and up to date?
+COMPLETENESS: Browse the codebase for TODOs, FIXMEs, stub implementations, placeholder UI,
+commented-out code, and features mentioned in docs but not implemented. Check if tests exist.
+Score as percentage complete with evidence.
 ```
 
-For `project --focus architecture`:
+**quality:**
 ```
-Assess architecture:
-- Is the separation of concerns clear?
-- Are dependencies between modules well-managed?
-- Is the data flow easy to follow?
-- Are there circular dependencies?
-- Is the project structure intuitive for a new developer?
-- Are abstractions at the right level (not over/under-engineered)?
+QUALITY: Check naming conventions, function/file sizes, DRY violations, error handling patterns,
+type safety, and dependency hygiene. Read 5-10 representative source files across modules.
+```
+
+**architecture:**
+```
+ARCHITECTURE: Map the module dependency graph. Check separation of concerns, data flow clarity,
+circular dependencies, abstraction levels. Is the structure intuitive for a new developer?
+```
+
+**security:**
+```
+SECURITY: Scan for hardcoded secrets, SQL injection, XSS, missing auth checks, insecure
+dependencies, exposed internal errors. Check env handling and input validation at boundaries.
+```
+
+**performance:**
+```
+PERFORMANCE: Look for N+1 queries, missing indexes (check migration files), unnecessary
+computation in hot paths, memory leaks, missing pagination, large payloads without streaming.
+```
+
+**testing:**
+```
+TESTING: Check test file existence, coverage config, test patterns (unit/integration/e2e).
+Are critical paths tested? Are tests meaningful or just smoke tests?
+```
+
+**types:**
+```
+TYPES: Check for `any` casts, missing return types, loose interfaces, unvalidated external data.
+Is there runtime validation (Zod, joi) at system boundaries?
+```
+
+**bugs:**
+```
+BUGS: Look for logic errors, off-by-one, race conditions, null/undefined access, unhandled
+promise rejections, incorrect error propagation, edge cases in state machines.
 ```
 
 For `ask` mode:
 ```
 The user asks: "{user's question}"
-Answer this question thoroughly based on the codebase context provided.
-Be specific — reference actual files, functions, and line numbers.
+
+Explore the codebase to answer this question thoroughly.
+Navigate actual source files — read the relevant modules, trace the code paths.
+Be specific: reference actual files, functions, and line numbers.
+Do not guess — if you can't find evidence, say so.
+
+{custom_prompt if provided}
 ```
+
+### Part 3: Custom Prompt (optional)
+
+Append user's `--prompt` value if provided.
+
+Write the assembled prompt to `/tmp/codex-review-prompt.txt`.
 
 ## Step 4: Dispatch to Codex
 
-**For git-based reviews (diff/commit/pr):**
+### Strategy by mode:
+
+**Git-based reviews (diff/commit/pr) — use `codex review` (native, fast):**
 ```bash
 codex review --uncommitted "{focus-aware prompt}"
 codex review --base <branch> "{focus-aware prompt}"
 codex review --commit <sha> "{focus-aware prompt}"
 ```
 
-**For all other modes (file/dir/doc/project/ask):**
+**File/dir reviews — use `codex exec` with context piped in:**
+For small targets (<50KB total), pipe the file contents:
 ```bash
-# Write context to temp file, pipe to codex exec
-cat /tmp/codex-review-context.txt | codex exec "{review prompt}" --full-auto -o /tmp/codex-review-result.md
+echo "{file contents}" | codex exec "Review this code. {focus instructions}" -s read-only -o /tmp/codex-review-result.md
 ```
 
-If context is too large (>100KB), split into chunks:
-1. Send project overview + structure first
-2. Then send detailed file contents in batches
-3. Ask Codex to synthesize across batches
+For large targets, let Codex read them itself:
+```bash
+codex exec "Review the files in {dir}. {focus instructions}" -C {project-root} -s read-only -o /tmp/codex-review-result.md
+```
+
+**Doc reviews — pipe the document:**
+```bash
+cat {doc-path} | codex exec "Review this document. {focus instructions}" -s read-only -o /tmp/codex-review-result.md
+```
+
+**Project/ask reviews — let Codex explore (critical difference):**
+
+Codex exec is an **agent with file system access**. Don't pipe the whole project — give it the brief + instructions and let it navigate:
+
+```bash
+codex exec "$(cat /tmp/codex-review-prompt.txt)" \
+  -C {project-root} \
+  -s read-only \
+  -o /tmp/codex-review-result.md
+```
+
+Key flags:
+- `-C {project-root}` — sets Codex's working directory to the project
+- `-s read-only` — sandbox: can read all files but not modify anything
+- `-o /tmp/codex-review-result.md` — captures the final output
+- `--full-auto` — optional, auto-approves Codex's own tool calls (file reads, commands)
+
+This way Codex can:
+- `ls`, `find`, `cat` any file in the project
+- Run `grep` to search for patterns
+- Read package.json, configs, source files as needed
+- Build a comprehensive understanding autonomously
 
 **Important:**
-- Timeout: 180s for project mode, 120s for others
-- If Codex fails, report error and suggest fixes
-- Capture full output
+- Timeout: 300s for project mode (Codex needs time to explore), 180s for ask, 120s for others
+- If Codex produces no output file, check if it printed to stdout instead
+- If Codex fails, report error and suggest: check `codex login`, check API key, retry
 
 ## Step 5: Evaluate Codex Findings
 
