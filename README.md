@@ -1,41 +1,21 @@
-# codex-review
+# claude-codex-review
 
-Cross-model code review skill for [Claude Code](https://claude.ai/code). Uses OpenAI Codex as an independent reviewer, with Claude orchestrating the fix-and-review loop.
+A [Claude Code](https://claude.ai/code) slash command that uses OpenAI Codex as an independent reviewer. Two models, one review loop — Codex reviews, Claude evaluates and fixes, Codex re-reviews.
 
-## Why?
-
-Two models catch more bugs than one. Codex and Claude have different training data, different blindspots, and different strengths. This skill lets them collaborate: Codex reviews, Claude evaluates and fixes, then Codex re-reviews — until the code passes or max rounds are reached.
-
-## Install
-
-### One-line install (recommended)
+## Installation
 
 ```bash
-# Add the slash command to Claude Code
-claude install-skill clawlabz/codex-review
+curl -fsSL https://raw.githubusercontent.com/clawlabz/claude-codex-review/main/install.sh | bash
 ```
 
-### Manual install
-
-```bash
-# 1. Clone
-git clone https://github.com/clawlabz/codex-review.git ~/.claude/skills/codex-review
-
-# 2. Copy the command file
-cp ~/.claude/skills/codex-review/commands/codex-review.md ~/.claude/commands/codex-review.md
-```
+Restart Claude Code — `/codex-review` is ready.
 
 ### Prerequisites
 
+Codex CLI must be installed and authenticated:
+
 ```bash
-# Install Codex CLI
-npm i -g @openai/codex
-
-# Authenticate
-codex login
-
-# Register MCP server (optional, for tighter integration)
-claude mcp add codex -s user -- codex mcp-server
+npm i -g @openai/codex && codex login
 ```
 
 ## Usage

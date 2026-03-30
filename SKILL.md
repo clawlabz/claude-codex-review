@@ -1,5 +1,5 @@
 ---
-name: codex-review
+name: claude-codex-review
 description: >
   Cross-model code review using OpenAI Codex as an independent reviewer.
   Supports 8 modes: git diff, commit, file, dir, doc, PR, project-wide assessment,
