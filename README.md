@@ -125,6 +125,24 @@ Control what gets evaluated with `--focus` (comma-separated):
 4. **Fix Issues** — Claude applies minimal, safe fixes for confirmed issues
 5. **Re-Review** — Codex reviews the fixed code; loop continues until passing
 
+### Dispatch Strategy
+
+Different modes use different Codex capabilities:
+
+| Mode | Codex Command | How Context is Passed |
+|------|---------------|----------------------|
+| diff | `codex review --uncommitted` | Native git integration — Codex reads repo directly |
+| commit | `codex review --commit <sha>` | Native git integration |
+| pr | `codex review --base <branch>` | Native git integration |
+| file (small) | `codex exec` | File contents piped via stdin |
+| dir (small) | `codex exec` | File contents piped via stdin |
+| file/dir (large) | `codex exec -C <dir> -s read-only` | Codex explores filesystem itself |
+| doc | `codex exec` | Document piped via stdin |
+| **project** | `codex exec -C <dir> -s read-only` | **Codex agent explores the codebase autonomously** |
+| **ask** | `codex exec -C <dir> -s read-only` | **Codex agent navigates files to find answers** |
+
+Key insight: `codex exec` is an **agent**, not a text processor. For `project` and `ask` modes, Claude sends a lightweight project brief + review instructions, then Codex autonomously navigates the codebase (`ls`, `cat`, `grep`, etc.) to build its own understanding.
+
 ## Review Modes
 
 | Mode | Best For | Auto-Fix | Example |
