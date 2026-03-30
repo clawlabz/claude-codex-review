@@ -2,10 +2,12 @@
 name: codex-review
 description: >
   Cross-model code review using OpenAI Codex as an independent reviewer.
-  Supports reviewing git diffs, specific files, directories, or documents.
+  Supports 8 modes: git diff, commit, file, dir, doc, PR, project-wide assessment,
+  and free-form questions. Configurable focus dimensions (bugs, security, quality,
+  performance, architecture, completeness, testing, types).
   Iterates fix-and-review cycles until passing or max rounds reached.
-  Use when: code review, PR review, architecture review, implementation audit,
-  or any quality gate that benefits from a second-opinion AI model.
+  Use when: code review, PR review, architecture review, project completeness audit,
+  code quality assessment, or any question that benefits from a second-opinion AI model.
 metadata:
   author: https://github.com/clawlabz
   version: "1.0.0"
@@ -41,20 +43,39 @@ A skill that uses OpenAI Codex as an independent reviewer to provide a "second o
 
 ### Modes
 
-| Mode | Target | What Gets Reviewed |
-|------|--------|--------------------|
-| `diff` (default) | `--base main` | Uncommitted changes or branch diff |
-| `commit` | `<sha>` | A specific commit |
-| `file` | `path/to/file.ts` | One or more specific files |
-| `dir` | `src/lib/` | All files in a directory |
-| `doc` | `docs/design.md` | A document (PRD, design doc, plan) |
-| `pr` | `#123` or URL | Pull request (fetches diff via gh) |
+| Mode | Target | What Gets Reviewed | Fix Loop |
+|------|--------|--------------------|----------|
+| `diff` (default) | `--base main` | Uncommitted changes or branch diff | Yes |
+| `commit` | `<sha>` | A specific commit | Yes |
+| `file` | `path/to/file.ts` | One or more specific files | Yes |
+| `dir` | `src/lib/` | All files in a directory | Yes |
+| `doc` | `docs/design.md` | A document (PRD, design doc, plan) | No |
+| `pr` | `#123` or URL | Pull request (fetches diff via gh) | Yes |
+| `project` | (entire repo) | Holistic project assessment | No |
+| `ask` | `"question"` | Free-form question about the codebase | No |
+
+### Focus Dimensions
+
+Control WHAT Codex evaluates with `--focus`:
+
+| Focus | What It Evaluates |
+|-------|-------------------|
+| `bugs` | Logic errors, edge cases, crash risks |
+| `security` | Vulnerabilities, injection, auth, secrets |
+| `quality` | Code style, readability, naming, complexity |
+| `performance` | N+1 queries, memory leaks, unnecessary computation |
+| `architecture` | Separation of concerns, coupling, patterns |
+| `completeness` | Missing features, TODOs, stub implementations |
+| `testing` | Test coverage, missing cases, flaky patterns |
+| `types` | Type safety, any-casts, missing types |
+| `all` | Everything above (default for `project` mode) |
 
 ### Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--rounds` | `3` | Maximum review-fix cycles |
+| `--focus` | auto | Comma-separated focus dimensions |
 | `--fix` | `true` | Auto-fix issues found by Codex |
 | `--no-fix` | — | Report only, no auto-fix |
 | `--prompt` | — | Custom review instructions appended to context |
@@ -84,8 +105,23 @@ A skill that uses OpenAI Codex as an independent reviewer to provide a "second o
 # Review a PR
 /codex-review pr #42
 
+# Full project assessment
+/codex-review project
+
+# Project completeness audit
+/codex-review project --focus completeness
+
+# Quality + security focused review
+/codex-review project --focus quality,security
+
+# Free-form question about the codebase
+/codex-review ask "NPC系统设计是否合理？性能瓶颈在哪？"
+
+# Performance review of a specific module
+/codex-review dir src/lib/ --focus performance
+
 # Review with custom prompt, max 5 rounds
-/codex-review diff --rounds 5 --prompt "Focus on security and error handling"
+/codex-review diff --rounds 5 --prompt "Focus on error handling"
 
 # Report only, no fixes
 /codex-review diff --no-fix

@@ -62,8 +62,20 @@ claude mcp add codex -s user -- codex mcp-server
 # Review a pull request
 /codex-review pr #42
 
-# Custom review focus
-/codex-review diff --prompt "Focus on security and SQL injection"
+# Full project assessment (completeness, quality, architecture, etc.)
+/codex-review project
+
+# Project completeness audit only
+/codex-review project --focus completeness
+
+# Quality + security focused
+/codex-review project --focus quality,security
+
+# Free-form question about the codebase
+/codex-review ask "Is the NPC system well-designed? Where are the bottlenecks?"
+
+# Performance review of a module
+/codex-review dir src/lib/ --focus performance
 
 # Report only (no auto-fix)
 /codex-review --no-fix
@@ -74,6 +86,22 @@ claude mcp add codex -s user -- codex mcp-server
 # More review rounds
 /codex-review --rounds 5
 ```
+
+### Focus Dimensions
+
+Control what gets evaluated with `--focus` (comma-separated):
+
+| Focus | Evaluates |
+|-------|-----------|
+| `bugs` | Logic errors, edge cases, crash risks |
+| `security` | Vulnerabilities, injection, auth, secrets |
+| `quality` | Style, readability, naming, complexity |
+| `performance` | N+1 queries, memory, unnecessary work |
+| `architecture` | Coupling, patterns, separation of concerns |
+| `completeness` | TODOs, stubs, missing features, dead code |
+| `testing` | Coverage gaps, missing cases, flaky tests |
+| `types` | Type safety, any-casts, missing types |
+| `all` | Everything (default for `project` mode) |
 
 ## How It Works
 
@@ -99,14 +127,16 @@ claude mcp add codex -s user -- codex mcp-server
 
 ## Review Modes
 
-| Mode | Best For | Example |
-|------|----------|---------|
-| `diff` | Pre-commit / pre-merge review | `/codex-review diff --base main` |
-| `commit` | Post-commit audit | `/codex-review commit HEAD` |
-| `file` | Focused file review | `/codex-review file auth.ts` |
-| `dir` | Module-level review | `/codex-review dir src/api/` |
-| `doc` | Architecture/design review | `/codex-review doc DESIGN.md` |
-| `pr` | Pull request review | `/codex-review pr #42` |
+| Mode | Best For | Auto-Fix | Example |
+|------|----------|----------|---------|
+| `diff` | Pre-commit / pre-merge | Yes | `/codex-review diff --base main` |
+| `commit` | Post-commit audit | Yes | `/codex-review commit HEAD` |
+| `file` | Focused file review | Yes | `/codex-review file auth.ts` |
+| `dir` | Module-level review | Yes | `/codex-review dir src/api/` |
+| `doc` | Document review | No | `/codex-review doc DESIGN.md` |
+| `pr` | Pull request review | Yes | `/codex-review pr #42` |
+| `project` | Full project assessment | No | `/codex-review project` |
+| `ask` | Free-form question | No | `/codex-review ask "Is X well-designed?"` |
 
 ## Configuration
 
